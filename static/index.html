@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tactile diagrams</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <h1>Tactile diagrams</h1>
+    <p>Turn a textbook diagram into a Braille-labelled page for swell paper, embossing or 3D printing.</p>
+  </header>
+
+  <main class="app">
+    <aside class="controls" aria-label="Settings">
+      <section>
+        <h2>Diagram</h2>
+        <div id="samples" class="samples" role="group" aria-label="Sample diagrams"></div>
+        <label class="drop" id="drop">
+          <input type="file" id="file" accept="image/*">
+          <span>Upload a photo or scan</span>
+          <small>PNG, JPG or WebP, up to 12 MB</small>
+        </label>
+      </section>
+
+      <section>
+        <h2>Page</h2>
+        <label class="field">Title
+          <input id="title" type="text" maxlength="200" autocomplete="off">
+        </label>
+        <label class="check"><input type="checkbox" id="ink" checked> Print the text as well</label>
+        <p class="hint">Turn this off for swell paper: grey text would swell too.</p>
+        <label class="check"><input type="checkbox" id="border" checked> Frame around the diagram</label>
+      </section>
+
+      <section>
+        <h2>Line work</h2>
+        <label class="field">Source type
+          <select id="mode">
+            <option value="auto">Scan or photo of a page</option>
+            <option value="solid">Clean digital drawing</option>
+            <option value="edges">Photo of an object (edges)</option>
+          </select>
+        </label>
+        <label class="slider">Line weight <output id="line_mm_out"></output>
+          <input type="range" id="line_mm" min="0.8" max="3" step="0.1" value="1.4">
+        </label>
+        <label class="slider">Ignore small marks <output id="detail_out"></output>
+          <input type="range" id="detail" min="0" max="100" step="1" value="25">
+        </label>
+        <p class="hint">Removes printed letters and specks. Dashed lines are kept. If some printed text is left, raise this, or choose "Erase area" above the sheet and drag a box over it.</p>
+        <div id="erase_row" class="row" hidden>
+          <span id="erase_count" class="hint"></span>
+          <button type="button" id="erase_undo" class="secondary">Undo erase</button>
+          <button type="button" id="erase_clear" class="secondary">Clear erased areas</button>
+        </div>
+        <label class="slider" id="sens_wrap">Line sensitivity <output id="sensitivity_out"></output>
+          <input type="range" id="sensitivity" min="1" max="40" step="1" value="30">
+        </label>
+      </section>
+
+      <section>
+        <h2>Labels</h2>
+        <p class="hint">Click a part of the diagram on the sheet: an arrow is placed on it, then type its name here. Each label becomes a Braille key letter on the diagram and a full Braille entry in the key. Drag a marker, or the ring at the end of an arrow, to move it. Arrow keys work too.</p>
+        <ul id="labels" class="labels"></ul>
+        <div class="row">
+          <button type="button" id="add" class="secondary">Add label</button>
+          <button type="button" id="suggest" class="secondary" hidden>Name all parts</button>
+        </div>
+        <label class="check" id="autoname_wrap" hidden>
+          <input type="checkbox" id="autoname" checked> Rename a label when I move its pointer
+        </label>
+        <div class="keybox" id="keybox">
+          <p class="hint">Naming parts from the image uses a vision model. Pick a free provider and paste its key. The key stays in this running app's memory only.</p>
+          <label class="field">Provider
+            <select id="provider"></select>
+          </label>
+          <p class="hint" id="provider_help"></p>
+          <label class="field" id="base_wrap" hidden>Base URL
+            <input id="base" type="text" placeholder="https://api.example.com/v1" autocomplete="off">
+          </label>
+          <label class="field">Model
+            <input id="model" type="text" autocomplete="off">
+          </label>
+          <div class="row">
+            <input type="password" id="apikey" placeholder="Paste key" autocomplete="off" aria-label="API key">
+            <button type="button" id="savekey" class="secondary">Use key</button>
+          </div>
+        </div>
+      </section>
+    </aside>
+
+    <section class="stage" aria-label="Preview">
+      <div class="stage-bar">
+        <div class="seg" role="radiogroup" aria-label="View">
+          <label><input type="radio" name="view" value="tactile" checked><span>Tactile page</span></label>
+          <label><input type="radio" name="view" value="source"><span>Original</span></label>
+        </div>
+        <div class="seg" role="radiogroup" aria-label="Click tool" id="tools">
+          <label><input type="radio" name="tool" value="label" checked><span>Label a part</span></label>
+          <label><input type="radio" name="tool" value="erase"><span>Erase area</span></label>
+        </div>
+        <button type="button" id="download" class="primary" disabled>Download SVG</button>
+      </div>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+
+      <div class="desk">
+        <div id="empty" class="empty">
+          <p>Pick a sample or upload a diagram to start.</p>
+        </div>
+        <div id="sheet" class="sheet" hidden>
+          <div id="svgbox"></div>
+          <div id="hit" class="hit"></div>
+          <div id="overlay" class="overlay"></div>
+          <div id="band" class="band" hidden></div>
+        </div>
+        <img id="source" class="source" alt="Original diagram" hidden>
+      </div>
+
+      <div class="report">
+        <ul id="warnings" class="warnings"></ul>
+        <dl id="stats" class="stats"></dl>
+        <div id="braille_key" class="braille-key" hidden>
+          <h2>Key in Braille</h2>
+          <div id="braille_rows"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
